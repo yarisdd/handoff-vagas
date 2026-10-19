@@ -455,4 +455,75 @@ function vbusca_email(ss, sh, novas) {
 
 // ---------------------------------------------------------------- fontes iniciais (usadas só pelo vagasBuscaInstalar)
 
-var VBUSCA_FONTES_INICIAIS = __FONTES__;
+var VBUSCA_FONTES_INICIAIS = [
+ {
+  "tipo": "pagina",
+  "nome": "FMUSP · Eventos",
+  "url": "https://www.fm.usp.br/fmusp/institucional/eventos"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "Agência FAPESP · Agenda de cursos e escolas",
+  "url": "https://agencia.fapesp.br/agenda/"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "INCA · Eventos e curso de verão",
+  "url": "https://www.gov.br/inca/pt-br/assuntos/eventos"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "Pequeno Príncipe · Eventos",
+  "url": "https://pequenoprincipe.org.br/evento/"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "CFM · Eventos",
+  "url": "https://portal.cfm.org.br/eventos"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "Utrecht Summer School · Life Sciences",
+  "url": "https://utrechtsummerschool.nl/courses/life-sciences"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "Leiden University · Summer schools",
+  "url": "https://www.universiteitleiden.nl/en/education/study-programmes/summer-schools"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "UCL Summer School · Módulos",
+  "url": "https://www.ucl.ac.uk/prospective-students/summer-school/modules"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "LSHTM · Short courses",
+  "url": "https://www.lshtm.ac.uk/study/courses/short-courses/a-z"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "Karolinska · Summer courses abroad",
+  "url": "https://education.ki.se/student-at-ki/studies-and-traineeships-abroad/summer-courses-abroad"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "Institut Pasteur · Cursos",
+  "url": "https://www.pasteur.fr/en/about-us/our-missions/education/training-programs/pasteur-courses"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "EMBL · Cursos e conferências",
+  "url": "https://www.embl.org/events/"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "Calendário de congressos estudantis (MU Varna)",
+  "url": "https://bsysb.mu-varna.bg/conference-calender/"
+ },
+ {
+  "tipo": "pagina",
+  "nome": "Universidade de Copenhague · Summer courses de saúde global",
+  "url": "https://globalhealth.ku.dk/studies/summer-courses/"
+ }
+];
