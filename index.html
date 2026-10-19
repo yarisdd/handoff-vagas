@@ -1550,7 +1550,7 @@ footer p strong { color: var(--ink); }
     { name: "Estágio/Observership", k: "estagio", dot: "--k-estagio", desc: "Acompanhar a rotina de um serviço de saúde de perto, com supervisão, e ver na prática como funciona o dia a dia." },
     { name: "Pesquisa", k: "pesquisa", dot: "--k-pesquisa", desc: "Programas e bolsas para fazer ciência com orientador, da iniciação científica a estágios em centros internacionais." },
     { name: "Intercâmbio", k: "intercambio", dot: "--k-intercambio", desc: "Estágios clínicos e projetos de pesquisa em outro país ou região, por redes estudantis e programas do governo." },
-    { name: "Evento científico", k: "evento", dot: "--k-evento", desc: "Congressos e encontros para apresentar trabalho, ganhar horas e conhecer quem está fazendo medicina em outros lugares." },
+    { name: "Evento científico", label: "Congressos e eventos", k: "evento", dot: "--k-evento", desc: "Congressos e encontros para apresentar trabalho, ganhar horas e conhecer quem está fazendo medicina em outros lugares." },
     { name: "Bolsa", k: "bolsa", dot: "--k-bolsa", desc: "Auxílio para viajar, estudar ou fazer um curso sem tirar tudo do próprio bolso." },
     { name: "Curso online", k: "online", dot: "--k-online", desc: "Cursos gratuitos com certificado, no seu ritmo, para somar horas complementares." }
   ];
@@ -1628,7 +1628,7 @@ footer p strong { color: var(--ink); }
   function catChip(name) {
     var c = BY_NAME[name];
     var s = el("span", "cat"); s.style.setProperty("--dot", "var(" + (c ? c.dot : "--muted") + ")");
-    s.appendChild(el("i")); s.appendChild(document.createTextNode(name || "Oportunidade"));
+    s.appendChild(el("i")); s.appendChild(document.createTextNode((c && c.label) || name || "Oportunidade"));
     return s;
   }
 
@@ -1734,7 +1734,7 @@ footer p strong { color: var(--ink); }
     var scene = el("div", "kscene"); scene.setAttribute("aria-hidden", "true");
     scene.appendChild(icon("k-" + c.k, "kicon-big")); scene.appendChild(icon("i-cross", "kx"));
     a.appendChild(scene); a.appendChild(el("div", "kshade"));
-    a.appendChild(el("h3", null, c.name));
+    a.appendChild(el("h3", null, c.label || c.name));
     a.appendChild(el("p", null, c.desc));
     var n = counts[c.name], ab = openCounts[c.name] || 0;
     var g = el("span", "kgo", "Ver " + n + (n === 1 ? " vaga" : " vagas") + (ab ? " · " + ab + (ab === 1 ? " aberta" : " abertas") : ""));
@@ -1754,7 +1754,7 @@ footer p strong { color: var(--ink); }
   var catSel = document.getElementById("f-cat"), paisSel = document.getElementById("f-pais"), stSel = document.getElementById("f-status");
   CAT.forEach(function (c) {
     if (!counts[c.name]) return;
-    var op = document.createElement("option"); op.value = c.name; op.textContent = c.name + " (" + counts[c.name] + ")"; catSel.appendChild(op);
+    var op = document.createElement("option"); op.value = c.name; op.textContent = (c.label || c.name) + " (" + counts[c.name] + ")"; catSel.appendChild(op);
   });
   var paises = {};
   data.forEach(function (o) { if (o.pais) paises[o.pais] = (paises[o.pais] || 0) + 1; });
