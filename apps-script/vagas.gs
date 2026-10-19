@@ -1,7 +1,7 @@
 /**
- * Handoff Vagas — conferência diária das vagas do site.
+ * Handoff Vagas — conferência diária das vagas do site, sem aprovação manual.
  *
- * Vai como um ARQUIVO NOVO (vagas.gs) no Apps Script da planilha Handoff — Base.
+ * Vai como um ARQUIVO (vagas.gs) no Apps Script da planilha Handoff — Base.
  * Tudo aqui tem o prefixo "vagas" para não colidir com o código das ligas,
  * e o script só mexe na aba "Vagas do site".
  *
@@ -9,28 +9,31 @@
  *   1. Na Handoff — Base: Extensões > Apps Script > "+" ao lado de Arquivos > Script > nome: vagas
  *   2. Cole este conteúdo e salve.
  *   3. No topo, escolha a função vagasInstalar e clique em Executar. Autorize quando pedir.
- *   Isso cria a aba "Vagas do site" com as vagas atuais, o menu "Handoff Vagas",
- *   o gatilho diário das 7h, e faz a primeira conferência.
+ *   (Quem já instalou a versão anterior só substitui o conteúdo e salva: as colunas novas entram sozinhas.)
  *
- * Rotina:
- *   - Todo dia às 7h, vagasConferir() abre cada link, marca o que saiu do ar ou mudou
- *     e te manda um e-mail só quando há algo para olhar.
- *   - Você corrige a linha, seleciona a linha e usa o menu
- *     Handoff Vagas > Marcar linhas selecionadas como conferidas.
- *   - Coluna "publicar" = não esconde a vaga do site sem apagar.
+ * Todo dia às 7h, vagasConferir() abre cada link e resolve sozinho o que der:
+ *   - link fora do ar por 3 dias seguidos: a vaga sai do site (publicar = não);
+ *   - página mudou ou prazo passou: a IA relê a página (VagasBusca.gs) e, se o novo prazo estiver escrito nela,
+ *     atualiza as datas; se o prazo for o mesmo, marca como conferida.
+ * O que não der para resolver sozinho fica com conferir = SIM e aparece no e-mail, só para informação.
  */
 
 var VAGAS = {
   ABA: 'Vagas do site',
   TZ: 'America/Sao_Paulo',
   HORA: 7,
-  DIAS_SEM_ACESSO: 14, // sites que bloqueiam a checagem voltam para a lista a cada 14 dias
+  DIAS_SEM_ACESSO: 14,     // site que bloqueia a checagem volta para a lista a cada 14 dias
+  FALHAS_PARA_TIRAR: 3,    // dias seguidos com o link fora do ar até a vaga sair do site
+  RELEITURAS_POR_DIA: 12,  // quantas páginas a IA relê por rodada
+  DIAS_RELER_ENCERRADA: 7, // vaga recorrente encerrada: a IA procura o ciclo novo a cada 7 dias
+  TEMPO_MAX_MS: 300000,
   // Colunas que você edita (o site lê estas)
   COLS: ['publicar', 'titulo', 'instituicao', 'categoria', 'pais', 'cidade', 'modalidade', 'publico', 'custo',
     'inscricao_abre', 'inscricao_fecha', 'periodo_programa', 'recorrente', 'ciclo', 'resumo', 'link', 'conferido_em'],
   // Colunas preenchidas pelo script
-  MON: ['conferir', 'motivo', 'situacao_link', 'pagina_mudou_em', 'datas_na_pagina', 'ultima_checagem', 'assinatura'],
-  DATAS: ['inscricao_abre', 'inscricao_fecha', 'conferido_em', 'pagina_mudou_em', 'ultima_checagem'],
+  MON: ['conferir', 'motivo', 'situacao_link', 'pagina_mudou_em', 'datas_na_pagina', 'ultima_checagem', 'assinatura',
+    'falhas', 'relido_em', 'origem'],
+  DATAS: ['inscricao_abre', 'inscricao_fecha', 'conferido_em', 'pagina_mudou_em', 'ultima_checagem', 'relido_em'],
   OPCOES: {
     publicar: ['sim', 'não'],
     recorrente: ['sim', 'não'],
@@ -51,6 +54,7 @@ var VAGAS = {
 function vagasMenu() {
   SpreadsheetApp.getUi().createMenu('Handoff Vagas')
     .addItem('Conferir agora', 'vagasConferir')
+    .addItem('Buscar vagas novas agora', 'vagasBuscar')
     .addItem('Marcar linhas selecionadas como conferidas', 'vagasMarcarConferidas')
     .addSeparator()
     .addItem('Reinstalar gatilhos das vagas', 'vagasCriarGatilhos')
@@ -63,7 +67,11 @@ function vagasInstalar() {
   var ss = SpreadsheetApp.getActive();
   var sh = ss.getSheetByName(VAGAS.ABA);
   if (sh && sh.getLastRow() > 1) {
-    throw new Error('A aba "' + VAGAS.ABA + '" já tem vagas. Para reinstalar do zero, apague só essa aba e rode vagasInstalar() de novo.');
+    vagas_garantirColunas(sh);
+    vagasCriarGatilhos();
+    vagasMenu();
+    ss.toast('A aba "' + VAGAS.ABA + '" já existia: colunas e gatilhos atualizados.');
+    return;
   }
   if (!sh) sh = ss.insertSheet(VAGAS.ABA, ss.getSheets().length); // entra no fim, sem mudar a ordem das outras abas
 
@@ -79,111 +87,178 @@ function vagasInstalar() {
       if (c === 'recorrente') return v ? 'sim' : 'não';
       if (VAGAS.DATAS.indexOf(c) >= 0) return vagas_paraData(v);
       return v == null ? '' : v;
-    }).concat(VAGAS.MON.map(function () { return ''; }));
+    }).concat(VAGAS.MON.map(function (c) { return c === 'origem' ? 'pesquisa inicial' : ''; }));
   });
   if (linhas.length) sh.getRange(2, 1, linhas.length, header.length).setValues(linhas);
-
-  var n = Math.max(linhas.length + 200, 300);
-  VAGAS.DATAS.forEach(function (c) { sh.getRange(2, header.indexOf(c) + 1, n, 1).setNumberFormat('dd/mm/yyyy'); });
-  Object.keys(VAGAS.OPCOES).forEach(function (c) {
-    var regra = SpreadsheetApp.newDataValidation().requireValueInList(VAGAS.OPCOES[c], true).setAllowInvalid(false).build();
-    sh.getRange(2, header.indexOf(c) + 1, n, 1).setDataValidation(regra);
-  });
-  var conf = sh.getRange(2, header.indexOf('conferir') + 1, n, 1);
-  sh.setConditionalFormatRules([
-    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('SIM').setBackground('#FBE7D6').setFontColor('#A84C06').setRanges([conf]).build()
-  ]);
+  vagas_formatar(sh);
   sh.setFrozenRows(1);
   sh.setFrozenColumns(2);
-  sh.setColumnWidth(header.indexOf('titulo') + 1, 280);
-  sh.setColumnWidth(header.indexOf('resumo') + 1, 360);
-  sh.setColumnWidth(header.indexOf('ciclo') + 1, 300);
-  sh.getRange(2, 1, n, header.length).setWrap(false).setVerticalAlignment('top');
 
   vagasCriarGatilhos();
   vagasMenu();
   vagasConferir();
 }
 
+/** Acrescenta no fim da linha 1 as colunas que faltarem (instalações antigas) e devolve {nome: índice}. */
+function vagas_garantirColunas(sh) {
+  var ultima = Math.max(sh.getLastColumn(), 1);
+  var head = sh.getRange(1, 1, 1, ultima).getValues()[0].map(function (h) { return String(h).trim(); });
+  var faltam = VAGAS.COLS.concat(VAGAS.MON).filter(function (c) { return head.indexOf(c) < 0; });
+  if (faltam.length) {
+    sh.getRange(1, head.length + 1, 1, faltam.length).setValues([faltam]).setFontWeight('bold').setBackground('#D9DEEA').setFontColor('#14206B');
+    head = head.concat(faltam);
+    vagas_formatar(sh);
+  }
+  var ix = {};
+  head.forEach(function (h, i) { ix[h] = i; });
+  return ix;
+}
+
+function vagas_formatar(sh) {
+  var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  var n = Math.max(sh.getLastRow() + 300, 400);
+  VAGAS.DATAS.forEach(function (c) { var i = head.indexOf(c); if (i >= 0) sh.getRange(2, i + 1, n, 1).setNumberFormat('dd/mm/yyyy'); });
+  Object.keys(VAGAS.OPCOES).forEach(function (c) {
+    var i = head.indexOf(c);
+    if (i < 0) return;
+    var regra = SpreadsheetApp.newDataValidation().requireValueInList(VAGAS.OPCOES[c], true).setAllowInvalid(false).build();
+    sh.getRange(2, i + 1, n, 1).setDataValidation(regra);
+  });
+  var ic = head.indexOf('conferir');
+  if (ic >= 0) {
+    sh.setConditionalFormatRules([
+      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('SIM').setBackground('#FBE7D6').setFontColor('#A84C06')
+        .setRanges([sh.getRange(2, ic + 1, n, 1)]).build()
+    ]);
+  }
+}
+
 function vagasCriarGatilhos() {
   var ss = SpreadsheetApp.getActive();
   ScriptApp.getProjectTriggers().forEach(function (t) {
     var f = t.getHandlerFunction();
-    if (f === 'vagasConferir' || f === 'vagasMenu') ScriptApp.deleteTrigger(t); // só os gatilhos das vagas
+    if (f === 'vagasConferir' || f === 'vagasMenu' || f === 'vagasBuscar') ScriptApp.deleteTrigger(t); // só os gatilhos das vagas
   });
   ScriptApp.newTrigger('vagasConferir').timeBased().everyDays(1).atHour(VAGAS.HORA).inTimezone(VAGAS.TZ).create();
   ScriptApp.newTrigger('vagasMenu').forSpreadsheet(ss).onOpen().create();
+  if (typeof vagasBuscar === 'function') ScriptApp.newTrigger('vagasBuscar').timeBased().everyHours(4).create();
 }
 
 // ---------------------------------------------------------------- conferência diária
 
 function vagasConferir() {
+  var inicio = Date.now();
   var ss = SpreadsheetApp.getActive();
   var sh = ss.getSheetByName(VAGAS.ABA);
   if (!sh) throw new Error('Aba "' + VAGAS.ABA + '" não encontrada. Rode vagasInstalar() primeiro.');
+  var ix = vagas_garantirColunas(sh);
   var valores = sh.getDataRange().getValues();
-  var head = valores[0].map(function (h) { return String(h).trim(); });
-  var ix = {};
-  head.forEach(function (h, i) { ix[h] = i; });
-  VAGAS.MON.concat(['link', 'titulo']).forEach(function (c) { if (ix[c] == null) throw new Error('Coluna "' + c + '" não encontrada na linha 1 da aba ' + VAGAS.ABA + '.'); });
-
   var hoje = vagas_inicioDoDia(new Date());
-  var rel = { fora: [], semAcesso: [], mudou: [], fecha: [], passou: [] };
-  var saida = [];
+  var podeReler = typeof vbusca_reler === 'function';
+  var relidas = 0;
+  var rel = { tiradas: [], atualizadas: [], confirmadas: [], pendentes: [], fecha: [] };
+  var mexer = VAGAS.MON.concat(['publicar', 'inscricao_abre', 'inscricao_fecha', 'periodo_programa', 'conferido_em']);
+  var cols = {};
+  mexer.forEach(function (c) { cols[c] = valores.slice(1).map(function (r) { return [r[ix[c]]]; }); });
 
   for (var r = 1; r < valores.length; r++) {
     var linha = valores[r];
-    var mon = VAGAS.MON.map(function (c) { return linha[ix[c]]; });
-    var m = {};
-    VAGAS.MON.forEach(function (c, i) { m[c] = mon[i]; });
+    var k = r - 1;
+    var get = function (c) { return cols[c] ? cols[c][k][0] : linha[ix[c]]; };
+    var set = function (c, v) { cols[c][k][0] = v; };
     var titulo = String(linha[ix.titulo] || '').trim();
     var link = String(linha[ix.link] || '').trim();
-    if (!titulo) { saida.push(mon); continue; }
-    var publicada = String(linha[ix.publicar] || 'sim').toLowerCase().indexOf('n') !== 0;
+    if (!titulo) continue;
+    var publicada = String(get('publicar') || 'sim').toLowerCase().indexOf('n') !== 0;
     var item = { titulo: titulo, linha: r + 1, link: link };
+    var motivos = [];
 
     // 1. Abre o link
-    if (/^https?:\/\//i.test(link)) {
-      var res = vagas_abrir(link);
-      m.ultima_checagem = new Date();
+    var res = null;
+    if (/^https?:\/\//i.test(link) && Date.now() - inicio < VAGAS.TEMPO_MAX_MS) {
+      res = vagas_abrir(link);
+      set('ultima_checagem', new Date());
       if (res.ok) {
-        m.situacao_link = 'OK';
-        if (m.assinatura && m.assinatura !== res.assinatura) m.pagina_mudou_em = new Date();
-        m.assinatura = res.assinatura;
-        m.datas_na_pagina = res.datas;
+        set('situacao_link', 'OK');
+        set('falhas', 0);
+        if (get('assinatura') && get('assinatura') !== res.assinatura) set('pagina_mudou_em', new Date());
+        set('assinatura', res.assinatura);
+        set('datas_na_pagina', res.datas);
       } else if (res.codigo === 404 || res.codigo === 410 || res.codigo === -1) {
-        m.situacao_link = 'Fora do ar' + (res.codigo > 0 ? ' (' + res.codigo + ')' : ' (site não responde)');
+        set('situacao_link', 'Fora do ar' + (res.codigo > 0 ? ' (' + res.codigo + ')' : ' (site não responde)'));
+        set('falhas', (Number(get('falhas')) || 0) + 1);
       } else {
-        m.situacao_link = 'Não deu para checar (' + res.codigo + ')';
+        set('situacao_link', 'Não deu para checar (' + res.codigo + ')');
       }
-    } else {
-      m.situacao_link = 'Sem link';
+    } else if (!/^https?:\/\//i.test(link)) {
+      set('situacao_link', 'Sem link');
+    }
+    var situacao = String(get('situacao_link') || '');
+
+    // 2. Link fora do ar há dias: sai do site sozinho
+    if (situacao.indexOf('Fora do ar') === 0 || situacao === 'Sem link') {
+      if (publicada && (Number(get('falhas')) || 0) >= VAGAS.FALHAS_PARA_TIRAR) {
+        set('publicar', 'não');
+        publicada = false;
+        motivos.push('tirada do site: link fora do ar há ' + get('falhas') + ' dias');
+        rel.tiradas.push(item);
+      } else if (publicada) {
+        motivos.push('link fora do ar (' + (Number(get('falhas')) || 1) + 'º dia)');
+      }
     }
 
-    // 2. Decide se precisa de conferência humana
-    var conferido = vagas_paraData(linha[ix.conferido_em], true);
-    var mudou = vagas_paraData(m.pagina_mudou_em, true);
-    var fecha = vagas_paraData(linha[ix.inscricao_fecha]);
-    var abre = vagas_paraData(linha[ix.inscricao_abre]);
+    // 3. Página mudou ou prazo passou: a IA relê a página e atualiza as datas se o prazo novo estiver escrito nela
+    var conferido = vagas_paraData(get('conferido_em'), true);
+    var mudou = vagas_paraData(get('pagina_mudou_em'), true);
+    var fecha = vagas_paraData(get('inscricao_fecha'));
     var recorrente = String(linha[ix.recorrente] || '').toLowerCase().indexOf('s') === 0;
-    var motivos = [];
-    if (m.situacao_link.indexOf('Fora do ar') === 0 || m.situacao_link === 'Sem link') { motivos.push('link fora do ar'); rel.fora.push(item); }
-    else if (m.situacao_link.indexOf('Não deu') === 0 && (!conferido || (hoje - conferido) / 86400000 >= VAGAS.DIAS_SEM_ACESSO)) {
-      // site que bloqueia robô: pede conferência manual a cada 14 dias, não todo dia
-      motivos.push('site bloqueou a checagem: abrir na mão'); rel.semAcesso.push(item);
+    var relido = vagas_paraData(get('relido_em'), true);
+    var mudouSemConferir = mudou && (!conferido || mudou > conferido);
+    var prazoPassou = fecha && fecha < hoje && recorrente && (!conferido || conferido <= fecha);
+    var relerEncerrada = prazoPassou && (!relido || (hoje - relido) / 86400000 >= VAGAS.DIAS_RELER_ENCERRADA);
+    if ((mudouSemConferir || relerEncerrada) && res && res.ok && res.html && podeReler &&
+        relidas < VAGAS.RELEITURAS_POR_DIA && Date.now() - inicio < VAGAS.TEMPO_MAX_MS) {
+      relidas++;
+      set('relido_em', new Date());
+      var atual = { titulo: titulo, instituicao: linha[ix.instituicao], inscricao_abre: get('inscricao_abre'), inscricao_fecha: get('inscricao_fecha') };
+      var nova = null;
+      try { nova = vbusca_reler(link, res.texto, res.links, atual); } catch (e) { nova = { erro: String(e.message || e) }; }
+      if (nova && nova.ok) {
+        var antes = vagas_fmtCurto(fecha);
+        var depois = vagas_fmtCurto(nova.inscricao_fecha);
+        set('conferido_em', new Date());
+        if (antes !== depois || vagas_fmtCurto(vagas_paraData(get('inscricao_abre'))) !== vagas_fmtCurto(nova.inscricao_abre)) {
+          set('inscricao_fecha', nova.inscricao_fecha);
+          set('inscricao_abre', nova.inscricao_abre || '');
+          if (nova.periodo_programa) set('periodo_programa', nova.periodo_programa);
+          item.extra = (antes || 'sem prazo') + ' → ' + depois;
+          rel.atualizadas.push(item);
+        } else {
+          rel.confirmadas.push(item);
+        }
+        mudouSemConferir = false;
+        prazoPassou = false;
+        fecha = vagas_paraData(get('inscricao_fecha'));
+      } else if (nova && nova.motivo) {
+        item.extra = nova.motivo;
+      }
     }
-    if (mudou && (!conferido || mudou > conferido)) { motivos.push('página mudou em ' + vagas_fmt(mudou)); rel.mudou.push(item); }
-    if (fecha && fecha < hoje && recorrente && (!conferido || conferido <= fecha)) { motivos.push('prazo passou: procurar o próximo ciclo'); rel.passou.push(item); }
-    if (publicada && fecha && fecha >= hoje && (!abre || abre <= hoje)) {
+    if (mudouSemConferir) { motivos.push('página mudou em ' + vagas_fmt(mudou)); rel.pendentes.push(item); }
+    else if (prazoPassou) { motivos.push('prazo passou: o ciclo novo ainda não está na página'); }
+    if (situacao.indexOf('Não deu') === 0 && (!conferido || (hoje - conferido) / 86400000 >= VAGAS.DIAS_SEM_ACESSO)) {
+      motivos.push('site bloqueia a checagem automática');
+    }
+
+    if (publicada && fecha && fecha >= hoje) {
+      var abre = vagas_paraData(get('inscricao_abre'));
       var d = Math.round((fecha - hoje) / 86400000);
-      if (d <= 7) { item.d = d; rel.fecha.push(item); }
+      if ((!abre || abre <= hoje) && d <= 7) rel.fecha.push({ titulo: titulo, linha: r + 1, link: link, extra: d === 0 ? 'fecha hoje' : 'D-' + d });
     }
-    m.conferir = motivos.length ? 'SIM' : '';
-    m.motivo = motivos.join('; ');
-    saida.push(VAGAS.MON.map(function (c) { return m[c] == null ? '' : m[c]; }));
+    set('conferir', motivos.length ? 'SIM' : '');
+    set('motivo', motivos.join('; '));
   }
 
-  if (saida.length) sh.getRange(2, ix[VAGAS.MON[0]] + 1, saida.length, VAGAS.MON.length).setValues(saida);
+  mexer.forEach(function (c) { if (cols[c].length) sh.getRange(2, ix[c] + 1, cols[c].length, 1).setValues(cols[c]); });
   vagas_enviarResumo(ss, sh, rel);
 }
 
@@ -199,44 +274,45 @@ function vagas_abrir(url) {
     if (tipo.indexOf('pdf') >= 0 || tipo.indexOf('octet-stream') >= 0 || /\.pdf($|\?)/i.test(url)) {
       return { ok: true, codigo: codigo, assinatura: vagas_hash(resp.getContent()), datas: '(PDF: checa só se o arquivo mudou)' };
     }
-    var texto = vagas_limpar(resp.getContentText());
+    var html = resp.getContentText();
+    var texto = vagas_limpar(html);
     var trechos = vagas_trechos(texto);
-    return { ok: true, codigo: codigo, assinatura: vagas_hash(trechos || texto), datas: vagas_datas(trechos || texto) };
+    return { ok: true, codigo: codigo, html: true, texto: texto, links: vagas_links(html, url),
+      assinatura: vagas_hash(trechos || texto), datas: vagas_datas(trechos || texto) };
   } catch (e) {
     return { ok: false, codigo: -1 };
   }
 }
 
-// ---------------------------------------------------------------- e-mail
+// ---------------------------------------------------------------- e-mail (só informativo)
 
 function vagas_enviarResumo(ss, sh, rel) {
-  var total = rel.fora.length + rel.semAcesso.length + rel.mudou.length + rel.fecha.length + rel.passou.length;
+  var total = rel.tiradas.length + rel.atualizadas.length + rel.pendentes.length + rel.fecha.length;
   if (!total) return;
   var base = ss.getUrl() + '#gid=' + sh.getSheetId() + '&range=A';
-  function lista(titulo, itens, extra) {
+  function lista(titulo, itens) {
     if (!itens.length) return '';
     return '<h3 style="margin:18px 0 6px;font-family:Arial;color:#14206B">' + titulo + ' (' + itens.length + ')</h3><ul style="margin:0;padding-left:18px;font-family:Arial;font-size:14px">' +
       itens.map(function (it) {
-        return '<li style="margin:4px 0"><a href="' + base + it.linha + '">' + vagas_esc(it.titulo) + '</a>' + (extra ? extra(it) : '') +
-          (it.link ? ' · <a href="' + vagas_esc(it.link) + '">abrir página</a>' : '') + '</li>';
+        return '<li style="margin:4px 0"><a href="' + base + it.linha + '">' + vagas_esc(it.titulo) + '</a>' + (it.extra ? ' — ' + vagas_esc(it.extra) : '') +
+          (it.link ? ' · <a href="' + vagas_esc(it.link) + '">página</a>' : '') + '</li>';
       }).join('') + '</ul>';
   }
   var html = '<div style="font-family:Arial;color:#0E1738">' +
-    '<p style="font-size:15px">Conferência das vagas do site em ' + vagas_fmt(new Date()) + '. Abra cada uma, corrija a linha na aba <b>' + VAGAS.ABA + '</b> e use <b>Handoff Vagas &gt; Marcar linhas selecionadas como conferidas</b>.</p>' +
-    lista('Fecham em até 7 dias (bom para divulgar)', rel.fecha, function (it) { return ' — ' + (it.d === 0 ? 'fecha hoje' : 'D-' + it.d); }) +
-    lista('Página mudou: conferir prazo e regras', rel.mudou) +
-    lista('Prazo passou: procurar o próximo ciclo', rel.passou) +
-    lista('Link fora do ar', rel.fora) +
-    lista('Site bloqueou a checagem automática (abrir na mão)', rel.semAcesso) +
+    '<p style="font-size:15px">Conferência automática das vagas do site em ' + vagas_fmt(new Date()) + '. Nada aqui precisa de aprovação: é só para você saber o que mudou.</p>' +
+    lista('Fecham em até 7 dias (bom para divulgar)', rel.fecha) +
+    lista('Prazo atualizado sozinho', rel.atualizadas) +
+    lista('Tiradas do site (link fora do ar)', rel.tiradas) +
+    lista('Página mudou e a IA não confirmou o prazo novo', rel.pendentes) +
     '</div>';
   MailApp.sendEmail({
     to: Session.getEffectiveUser().getEmail(),
-    subject: 'Handoff Vagas · ' + (rel.mudou.length + rel.passou.length + rel.fora.length) + ' para conferir, ' + rel.fecha.length + ' fechando',
+    subject: 'Handoff Vagas · ' + rel.atualizadas.length + ' atualizadas, ' + rel.tiradas.length + ' tiradas, ' + rel.fecha.length + ' fechando',
     htmlBody: html
   });
 }
 
-// ---------------------------------------------------------------- marcar como conferida
+// ---------------------------------------------------------------- marcar como conferida (opcional)
 
 function vagasMarcarConferidas() {
   var ss = SpreadsheetApp.getActive();
@@ -264,12 +340,36 @@ function vagas_limpar(html) {
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
-    .replace(/<(br|\/p|\/li|\/h\d|\/tr|\/div)\s*\/?>/gi, '\n')
+    .replace(/<(br|\/p|\/li|\/h\d|\/tr|\/div|\/td|\/th)\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#(\d+);/g, function (_, n) { return String.fromCharCode(+n); })
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, function (_, n) { return String.fromCharCode(+n); })
     .replace(/[ \t\r]+/g, ' ')
     .replace(/\n\s*/g, '\n')
     .trim();
+}
+/** Links da página: [{texto, url}] com endereço absoluto, sem repetir. */
+function vagas_links(html, base) {
+  var out = [], visto = {}, re = /<a\b[^>]*\bhref\s*=\s*["']([^"'#]+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi, m;
+  while ((m = re.exec(String(html))) && out.length < 250) {
+    var url = vagas_absoluto(m[1].trim(), base);
+    if (!url || visto[url]) continue;
+    var texto = vagas_limpar(m[2]).replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (texto.length < 3) continue;
+    visto[url] = 1;
+    out.push({ texto: texto, url: url });
+  }
+  return out;
+}
+function vagas_absoluto(href, base) {
+  if (/^(mailto|tel|javascript):/i.test(href)) return '';
+  if (/^https?:\/\//i.test(href)) return href;
+  var m = String(base).match(/^(https?:)\/\/([^\/?#]+)([^?#]*)/i);
+  if (!m) return '';
+  if (/^\/\//.test(href)) return m[1] + href;
+  if (/^\//.test(href)) return m[1] + '//' + m[2] + href;
+  var dir = m[3].replace(/[^\/]*$/, '');
+  return m[1] + '//' + m[2] + (dir || '/') + href;
 }
 function vagas_trechos(texto) {
   return texto.split(/\n|[.!?]\s+/).map(function (s) { return s.trim(); })
@@ -311,6 +411,7 @@ function vagas_paraData(v, manterHora) {
 }
 function vagas_inicioDoDia(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function vagas_fmt(d) { return Utilities.formatDate(d, VAGAS.TZ, 'dd/MM/yyyy'); }
+function vagas_fmtCurto(d) { d = vagas_paraData(d); return d ? Utilities.formatDate(d, VAGAS.TZ, 'dd/MM/yyyy') : ''; }
 function vagas_esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
 // ---------------------------------------------------------------- vagas iniciais (usadas só pelo vagasInstalar)
