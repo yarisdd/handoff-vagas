@@ -292,7 +292,7 @@ select { appearance: none; -webkit-appearance: none; padding-right: 32px; cursor
 .seg { display: inline-flex; background: var(--surface-2); border-radius: var(--r-sm); padding: 3px; gap: 2px; flex: 0 0 auto; }
 .seg button { font: inherit; font-size: 14.5px; font-weight: 600; border: 0; background: transparent; color: var(--muted); padding: 0 14px; height: 40px; border-radius: 8px; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
-.selects { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; flex: 1 1 480px; min-width: 0; }
+.selects { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); gap: 8px; flex: 1 1 480px; min-width: 0; }
 .toggles { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .chk { display: inline-flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 500; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 0 14px 0 10px; height: 38px; cursor: pointer; user-select: none; }
 .chk input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
@@ -538,7 +538,9 @@ footer p strong { color: var(--ink); }
       <div class="row">
         <div class="selects">
           <select id="f-cat" aria-label="Categoria"><option value="">Categorias</option></select>
+          <select id="f-reg" aria-label="Região"><option value="">Regiões</option></select>
           <select id="f-pais" aria-label="País"><option value="">Países</option></select>
+          <select id="f-mod" aria-label="Formato"><option value="">Presencial ou online</option></select>
           <select id="f-status" aria-label="Situação">
             <option value="">Qualquer situação</option>
             <option value="aberta">Inscrições abertas</option>
@@ -550,6 +552,7 @@ footer p strong { color: var(--ink); }
       </div>
       <div class="row">
         <div class="toggles">
+          <label class="chk" for="f-med"><input id="f-med" type="checkbox"> Só para medicina</label>
           <label class="chk" for="f-rec"><input id="f-rec" type="checkbox"> Só recorrentes</label>
           <label class="chk" for="f-free"><input id="f-free" type="checkbox"> Gratuitas ou com bolsa</label>
           <button type="button" class="clear" id="clear">Limpar filtros</button>
@@ -1570,6 +1573,22 @@ footer p strong { color: var(--ink); }
   function pad(n) { return String(n).padStart(2, "0"); }
   function fmt(d) { return pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear(); }
   function norm(s) { return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+  var REGIOES = ["Sul", "Sudeste", "Centro-Oeste", "Nordeste", "Norte"];
+  var UF_REG = { AC: "Norte", AP: "Norte", AM: "Norte", PA: "Norte", RO: "Norte", RR: "Norte", TO: "Norte",
+    AL: "Nordeste", BA: "Nordeste", CE: "Nordeste", MA: "Nordeste", PB: "Nordeste", PE: "Nordeste", PI: "Nordeste", RN: "Nordeste", SE: "Nordeste",
+    DF: "Centro-Oeste", GO: "Centro-Oeste", MT: "Centro-Oeste", MS: "Centro-Oeste",
+    ES: "Sudeste", MG: "Sudeste", RJ: "Sudeste", SP: "Sudeste", PR: "Sul", RS: "Sul", SC: "Sul" };
+  function regiaoDe(o) {
+    if (norm(o.modalidade) === "online") return "Online";
+    if (o.pais && norm(o.pais) !== "brasil") return "Internacional";
+    var m = String(o.cidade || "").match(/\/\s*([A-Z]{2})\s*$/);
+    return m && UF_REG[m[1]] ? UF_REG[m[1]] : "Nacional";
+  }
+  function soMedicina(o) {
+    if (norm(o.categoria) === "eletiva clinica") return true;
+    var t = norm(o.publico);
+    return /medicina/.test(t) && !/(saude|biolog|biomed|exatas|engenharia|afins|ciencias|profissionais|qualquer pessoa|educadores|docentes|pesquisadores)/.test(t);
+  }
 
   data.forEach(function (o) {
     var abre = parseDate(o.inscricao_abre), fecha = parseDate(o.inscricao_fecha);
@@ -1581,7 +1600,10 @@ footer p strong { color: var(--ink); }
     o._br = norm(o.pais) === "brasil";
     var c = norm(o.custo);
     o._free = c.indexOf("gratuito") === 0 || c.indexOf("com bolsa") === 0;
-    o._hay = norm([o.titulo, o.instituicao, o.cidade, o.pais, o.resumo, o.categoria, o.publico].join(" "));
+    // região e "só medicina": usa as colunas da planilha; se não existirem, calcula aqui com a mesma regra do script
+    o._reg = o.regiao || regiaoDe(o);
+    o._med = o.exclusivo_medicina ? /^s/i.test(o.exclusivo_medicina) : soMedicina(o);
+    o._hay = norm([o.titulo, o.instituicao, o.cidade, o.pais, o.resumo, o.categoria, o.publico, o._reg].join(" "));
   });
   var RANK = { aberta: 0, embreve: 1, confirmar: 2, encerrada: 3 };
   data.sort(function (a, b) {
@@ -1664,6 +1686,7 @@ footer p strong { color: var(--ink); }
     c.appendChild(inst);
     var tags = el("div", "tags");
     if (o.modalidade) tags.appendChild(el("span", "tag", o.modalidade));
+    if (o._med) tags.appendChild(el("span", "tag", "Só medicina"));
     if (o.custo) tags.appendChild(el("span", "tag" + (o._free ? " free" : ""), o.custo));
     if (o.recorrente) tags.appendChild(el("span", "tag", "↻ Recorrente"));
     if (tags.childNodes.length) c.appendChild(tags);
@@ -1738,10 +1761,23 @@ footer p strong { color: var(--ink); }
   Object.keys(paises).sort(function (a, b) { if (a === "Brasil") return -1; if (b === "Brasil") return 1; return a.localeCompare(b, "pt"); }).forEach(function (p) {
     var op = document.createElement("option"); op.value = p; op.textContent = p + " (" + paises[p] + ")"; paisSel.appendChild(op);
   });
+  var regSel = document.getElementById("f-reg"), modSel = document.getElementById("f-mod");
+  var regCount = {}, modCount = {};
+  data.forEach(function (o) {
+    regCount[o._reg] = (regCount[o._reg] || 0) + 1;
+    if (o.modalidade) modCount[o.modalidade] = (modCount[o.modalidade] || 0) + 1;
+  });
+  REGIOES.forEach(function (r) {
+    if (!regCount[r]) return;
+    var op = document.createElement("option"); op.value = r; op.textContent = r + " (" + regCount[r] + ")"; regSel.appendChild(op);
+  });
+  ["Presencial", "Híbrido", "Online"].concat(Object.keys(modCount)).filter(function (m, i, a) { return modCount[m] && a.indexOf(m) === i; }).forEach(function (m) {
+    var op = document.createElement("option"); op.value = m; op.textContent = m + " (" + modCount[m] + ")"; modSel.appendChild(op);
+  });
   var legend = document.getElementById("legend");
   CAT.forEach(function (c) { if (counts[c.name]) legend.appendChild(catChip(c.name)); });
 
-  var state = { q: "", where: "todos", cat: "", pais: "", st: "", rec: false, free: false };
+  var state = { q: "", where: "todos", cat: "", pais: "", reg: "", mod: "", st: "", med: false, rec: false, free: false };
   var list = document.getElementById("list"), count = document.getElementById("count");
   function render() {
     var terms = norm(state.q).trim().split(/\s+/).filter(Boolean);
@@ -1750,6 +1786,10 @@ footer p strong { color: var(--ink); }
       if (state.where === "exterior" && o._br) return false;
       if (state.cat && o.categoria !== state.cat) return false;
       if (state.pais && o.pais !== state.pais) return false;
+      // vagas nacionais (PIBIC, Rondon…) e online servem para qualquer região
+      if (state.reg && o._reg !== state.reg && o._reg !== "Nacional" && o._reg !== "Online") return false;
+      if (state.mod && o.modalidade !== state.mod) return false;
+      if (state.med && !o._med) return false;
       if (state.st && o._st !== state.st) return false;
       if (state.rec && !o.recorrente) return false;
       if (state.free && !o._free) return false;
@@ -1775,20 +1815,34 @@ footer p strong { color: var(--ink); }
   function setWhere(w) { state.where = w; segBtns.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.where === w)); }); }
   function syncInputs() {
     document.getElementById("q").value = state.q; catSel.value = state.cat; paisSel.value = state.pais; stSel.value = state.st;
+    regSel.value = state.reg; modSel.value = state.mod; document.getElementById("f-med").checked = state.med;
     document.getElementById("f-rec").checked = state.rec; document.getElementById("f-free").checked = state.free; setWhere(state.where);
   }
-  function resetState() { state = { q: "", where: "todos", cat: "", pais: "", st: "", rec: false, free: false }; }
+  function resetState() { state = { q: "", where: "todos", cat: "", pais: "", reg: "", mod: "", st: "", med: false, rec: false, free: false }; }
   segBtns.forEach(function (b) {
     b.addEventListener("click", function () {
       var w = b.dataset.where; setWhere(w);
       if (state.pais && (w === "todos" || (w === "brasil" && state.pais !== "Brasil") || (w === "exterior" && state.pais === "Brasil"))) { state.pais = ""; paisSel.value = ""; }
+      if (state.reg && w !== "brasil") { state.reg = ""; regSel.value = ""; }
       render();
     });
   });
   document.getElementById("q").addEventListener("input", function (e) { state.q = e.target.value; render(); });
   catSel.addEventListener("change", function (e) { state.cat = e.target.value; render(); });
-  paisSel.addEventListener("change", function (e) { state.pais = e.target.value; if (state.pais) setWhere(state.pais === "Brasil" ? "brasil" : "exterior"); render(); });
+  paisSel.addEventListener("change", function (e) {
+    state.pais = e.target.value;
+    if (state.pais) setWhere(state.pais === "Brasil" ? "brasil" : "exterior");
+    if (state.pais && state.pais !== "Brasil") { state.reg = ""; regSel.value = ""; }
+    render();
+  });
   stSel.addEventListener("change", function (e) { state.st = e.target.value; render(); });
+  regSel.addEventListener("change", function (e) {
+    state.reg = e.target.value;
+    if (state.reg) { setWhere("brasil"); if (state.pais && state.pais !== "Brasil") { state.pais = ""; paisSel.value = ""; } }
+    render();
+  });
+  modSel.addEventListener("change", function (e) { state.mod = e.target.value; render(); });
+  document.getElementById("f-med").addEventListener("change", function (e) { state.med = e.target.checked; render(); });
   document.getElementById("f-rec").addEventListener("change", function (e) { state.rec = e.target.checked; render(); });
   document.getElementById("f-free").addEventListener("change", function (e) { state.free = e.target.checked; render(); });
   document.getElementById("clear").addEventListener("click", function () { resetState(); syncInputs(); render(); });
