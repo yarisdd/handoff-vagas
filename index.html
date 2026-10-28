@@ -353,6 +353,45 @@ footer .wrap { padding-block: 34px 40px; display: grid; gap: 18px; font-size: 14
 footer p { margin: 0; max-width: 72ch; }
 footer p strong { color: var(--ink); }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+
+/* ---------- Sidebar de Notícias / Newsletter ---------- */
+.layout-with-sidebar { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: clamp(24px, 4vw, 48px); align-items: start; }
+.sidebar { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 90px); display: grid; gap: 16px; max-height: calc(100vh - env(safe-area-inset-top, 0px) - 110px); overflow-y: auto; padding-right: 4px; }
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
+.sidebar-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 10px; transition: border-color .2s ease, box-shadow .2s ease; }
+.sidebar-card:hover { border-color: var(--accent); box-shadow: 0 8px 24px -12px rgb(10 20 80 / 0.12); }
+.sidebar-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); padding: 3px 8px; border-radius: 6px; width: fit-content; }
+.sidebar-card h4 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 1.05rem; line-height: 1.25; letter-spacing: -0.01em; color: var(--ink); }
+.sidebar-card p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.sidebar-meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); font-weight: 500; }
+.sidebar-link { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 13px; color: var(--accent); text-decoration: none; margin-top: 2px; }
+.sidebar-link svg { width: 14px; height: 14px; transition: transform .2s ease; }
+.sidebar-link:hover svg { transform: translateX(3px); }
+/* ---------- Página de Notícias ---------- */
+.news-hero { background: var(--surface); border-bottom: 1px solid var(--line); padding-block: clamp(48px, 8vw, 80px); }
+.news-hero h1 { font-family: var(--f-display); font-weight: 700; letter-spacing: -0.03em; line-height: 1.06; font-size: clamp(2rem, 5vw, 3rem); margin: 12px 0 0; color: var(--ink); }
+.news-hero p { color: var(--muted); font-size: clamp(1rem, 1.6vw, 1.15rem); margin: 12px 0 0; max-width: 58ch; }
+.news-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 24px; padding-block: clamp(40px, 6vw, 72px); }
+.news-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: clamp(22px, 3vw, 32px); display: grid; gap: 14px; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.news-card:hover { border-color: var(--accent); box-shadow: 0 12px 32px -16px rgb(10 20 80 / 0.14); transform: translateY(-2px); }
+.news-card .sidebar-tag { margin-bottom: 2px; }
+.news-card h3 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: clamp(1.15rem, 2vw, 1.35rem); line-height: 1.2; letter-spacing: -0.015em; color: var(--ink); }
+.news-card p { margin: 0; font-size: 15px; line-height: 1.55; color: var(--muted); }
+.news-card .news-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 4px; }
+.news-card .news-date { font-size: 13px; font-weight: 500; color: var(--muted); }
+.news-card .news-link { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; color: var(--accent); text-decoration: none; }
+.news-card .news-link svg { width: 16px; height: 16px; transition: transform .2s ease; }
+.news-card:hover .news-link svg { transform: translateX(3px); }
+@media (prefers-reduced-motion: reduce) { .news-card, .news-card .news-link svg { transition: none; } .news-card:hover { transform: none; } }
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.sidebar-header h3 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--ink); }
+.sidebar-badge { font-family: var(--f-mono); font-size: 11px; font-weight: 600; background: var(--sun); color: var(--on-bright); padding: 2px 8px; border-radius: 99px; }
+@media (max-width: 960px) {
+  .layout-with-sidebar { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { position: static; max-height: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); overflow: visible; }
+  .sidebar-header { grid-column: 1 / -1; }
+}
 </style>
 </head>
 <body>
@@ -390,6 +429,7 @@ footer p strong { color: var(--ink); }
         <li><a href="#categorias" data-go="categorias">Categorias</a></li>
         <li><a href="#prazos" data-go="prazos">Prazos</a></li>
         <li><a href="#sobre" data-go="sobre">Quem somos</a></li>
+        <li><a href="#noticias" data-go="noticias">Notícias</a></li>
       </ul>
       <div class="nav-right">
         <a class="nav-cta" href="https://www.instagram.com/handoff.med/" target="_blank" rel="noopener noreferrer">
@@ -431,67 +471,114 @@ footer p strong { color: var(--ink); }
     </div>
   </div>
 
-  <section class="section" id="sobre">
-    <div class="wrap split">
-      <div class="about-text">
-        <div><span class="crumb"><b>Handoff</b><span>Quem somos</span></span></div>
-        <div class="about-title">
-          <h2>Muito além do feed: <span class="hl">um mapa das vagas de medicina</span></h2>
-          <svg class="badge" viewBox="0 0 140 140" role="img" aria-label="Selo: vagas para quem faz medicina">
-            <defs><path id="ring" d="M70,70 m-52,0 a52,52 0 1,1 104,0 a52,52 0 1,1 -104,0"/></defs>
-            <circle cx="70" cy="70" r="68" fill="var(--surface)" stroke="var(--line)"/>
-            <g class="ring"><text><textPath href="#ring" startOffset="0">VAGAS PARA QUEM FAZ MEDICINA • HANDOFF • </textPath></text></g>
-            <circle cx="70" cy="70" r="34" fill="var(--accent-soft)"/>
-            <path d="M64 50h12v14h14v12H76v14H64V76H50V64h14z" fill="var(--accent)"/>
-          </svg>
+  <div class="wrap layout-with-sidebar">
+    <div class="main-content">
+      <section class="section" id="sobre">
+        <div class="split">
+          <div class="about-text">
+            <div><span class="crumb"><b>Handoff</b><span>Quem somos</span></span></div>
+            <div class="about-title">
+              <h2>Muito além do feed: <span class="hl">um mapa das vagas de medicina</span></h2>
+              <svg class="badge" viewBox="0 0 140 140" role="img" aria-label="Selo: vagas para quem faz medicina">
+                <defs><path id="ring" d="M70,70 m-52,0 a52,52 0 1,1 104,0 a52,52 0 1,1 -104,0"/></defs>
+                <circle cx="70" cy="70" r="68" fill="var(--surface)" stroke="var(--line)"/>
+                <g class="ring"><text><textPath href="#ring" startOffset="0">VAGAS PARA QUEM FAZ MEDICINA • HANDOFF • </textPath></text></g>
+                <circle cx="70" cy="70" r="34" fill="var(--accent-soft)"/>
+                <path d="M64 50h12v14h14v12H76v14H64V76H50V64h14z" fill="var(--accent)"/>
+              </svg>
+            </div>
+            <p class="lead">O <strong>@handoff.med</strong> nasceu para divulgar os eventos das ligas acadêmicas da Unisul Pedra Branca. Este buscador vai além: reúne <strong>oportunidades abertas a estudantes de qualquer faculdade</strong>, no Brasil e fora dele, cada uma com o prazo e o link do edital oficial.</p>
+            <div><a class="btn btn-accent" href="#vagas" data-go="vagas">Abrir o buscador <svg aria-hidden="true"><use href="#i-chev"/></svg></a></div>
+          </div>
+          <div class="stage" aria-label="Exemplos de vagas com prazo próximo">
+            <div class="stage-block"></div>
+            <div class="stage-stack" id="stage-stack"></div>
+            <div class="note">
+              <span class="plus" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24"><path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z" fill="currentColor"/></svg></span>
+              <span>Você não precisa caçar edital: <em>a gente acompanha os prazos por você.</em></span>
+            </div>
+            <svg class="cross c1" aria-hidden="true"><use href="#i-cross"/></svg>
+            <svg class="cross c2" aria-hidden="true"><use href="#i-cross"/></svg>
+          </div>
         </div>
-        <p class="lead">O <strong>@handoff.med</strong> nasceu para divulgar os eventos das ligas acadêmicas da Unisul Pedra Branca. Este buscador vai além: reúne <strong>oportunidades abertas a estudantes de qualquer faculdade</strong>, no Brasil e fora dele, cada uma com o prazo e o link do edital oficial.</p>
-        <div><a class="btn btn-accent" href="#vagas" data-go="vagas">Abrir o buscador <svg aria-hidden="true"><use href="#i-chev"/></svg></a></div>
-      </div>
-      <div class="stage" aria-label="Exemplos de vagas com prazo próximo">
-        <div class="stage-block"></div>
-        <div class="stage-stack" id="stage-stack"></div>
-        <div class="note">
-          <span class="plus" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24"><path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z" fill="currentColor"/></svg></span>
-          <span>Você não precisa caçar edital: <em>a gente acompanha os prazos por você.</em></span>
-        </div>
-        <svg class="cross c1" aria-hidden="true"><use href="#i-cross"/></svg>
-        <svg class="cross c2" aria-hidden="true"><use href="#i-cross"/></svg>
-      </div>
-    </div>
-  </section>
+      </section>
 
-  <section class="section alt" id="categorias">
-    <div class="wrap">
-      <div class="split-head">
-        <div>
-          <span class="crumb"><b>Handoff</b><span>Categorias</span></span>
-          <h2>Oportunidades para <span class="hl">cada fase do curso</span></h2>
+      <section class="section alt" id="categorias">
+        <div class="split-head">
+          <div>
+            <span class="crumb"><b>Handoff</b><span>Categorias</span></span>
+            <h2>Oportunidades para <span class="hl">cada fase do curso</span></h2>
+          </div>
+          <div class="right">
+            <p class="lead">Do primeiro período ao internato, tem vaga para quem quer <strong>conhecer a pesquisa</strong>, <strong>ver a prática de perto</strong> ou <strong>estudar fora do país</strong>. Escolha uma categoria e veja só o que importa pra você.</p>
+            <a class="btn btn-accent" href="#vagas" data-go="vagas">Ver todas as vagas <svg aria-hidden="true"><use href="#i-chev"/></svg></a>
+          </div>
         </div>
-        <div class="right">
-          <p class="lead">Do primeiro período ao internato, tem vaga para quem quer <strong>conhecer a pesquisa</strong>, <strong>ver a prática de perto</strong> ou <strong>estudar fora do país</strong>. Escolha uma categoria e veja só o que importa pra você.</p>
-          <a class="btn btn-accent" href="#vagas" data-go="vagas">Ver todas as vagas <svg aria-hidden="true"><use href="#i-chev"/></svg></a>
-        </div>
-      </div>
-      <div class="cats" id="cats"></div>
-    </div>
-  </section>
+        <div class="cats" id="cats"></div>
+      </section>
 
-  <section class="section" id="prazos">
-    <div class="wrap">
-      <div class="split-head">
-        <div>
-          <span class="crumb"><b>Handoff</b><span>Prazos</span></span>
-          <h2>Inscrições <span class="hl">fechando em breve</span></h2>
+      <section class="section" id="prazos">
+        <div class="split-head">
+          <div>
+            <span class="crumb"><b>Handoff</b><span>Prazos</span></span>
+            <h2>Inscrições <span class="hl">fechando em breve</span></h2>
+          </div>
+          <div class="right">
+            <p class="lead">Os prazos são conferidos nas páginas oficiais. Quando a instituição ainda não divulgou o próximo ciclo, a vaga aparece como <strong>prazo a confirmar</strong>, com o padrão dos anos anteriores.</p>
+            <a class="btn btn-accent" href="#abertas" data-go="abertas">Ver vagas abertas <svg aria-hidden="true"><use href="#i-chev"/></svg></a>
+          </div>
         </div>
-        <div class="right">
-          <p class="lead">Os prazos são conferidos nas páginas oficiais. Quando a instituição ainda não divulgou o próximo ciclo, a vaga aparece como <strong>prazo a confirmar</strong>, com o padrão dos anos anteriores.</p>
-          <a class="btn btn-accent" href="#abertas" data-go="abertas">Ver vagas abertas <svg aria-hidden="true"><use href="#i-chev"/></svg></a>
-        </div>
-      </div>
-      <div class="soon" id="soon"></div>
+        <div class="soon" id="soon"></div>
+      </section>
     </div>
-  </section>
+
+    <aside class="sidebar" aria-label="Notícias e artigos de saúde">
+      <div class="sidebar-header">
+        <h3>Notícias & Saúde</h3>
+        <span class="sidebar-badge">Atualizado</span>
+      </div>
+
+      <article class="sidebar-card">
+        <span class="sidebar-tag">Pesquisa</span>
+        <h4>Novo protocolo de triagem neonatal é adotado pelo SUS</h4>
+        <p>Ministério da Saúde atualiza diretrizes para teste do pezinho, ampliando a detecção precoce de doenças raras em recém-nascidos.</p>
+        <div class="sidebar-meta">
+          <span>27 out 2026</span>
+          <a class="sidebar-link" href="#noticias" data-go="noticias">Ler mais <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        </div>
+      </article>
+
+      <article class="sidebar-card">
+        <span class="sidebar-tag">Congresso</span>
+        <h4>CBR 2026: resumos aprovados sobre IA na radiologia</h4>
+        <p>Confira os trabalhos brasileiros selecionados para apresentação oral no Congresso Brasileiro de Radiologia deste ano.</p>
+        <div class="sidebar-meta">
+          <span>25 out 2026</span>
+          <a class="sidebar-link" href="#noticias" data-go="noticias">Ler mais <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        </div>
+      </article>
+
+      <article class="sidebar-card">
+        <span class="sidebar-tag">Saúde Pública</span>
+        <h4>OMS alerta para surto de dengue no sudeste asiático</h4>
+        <p>Estudantes de medicina em intercâmbio devem verificar orientações de vacinação e prevenção antes de viajar para a região.</p>
+        <div class="sidebar-meta">
+          <span>22 out 2026</span>
+          <a class="sidebar-link" href="#noticias" data-go="noticias">Ler mais <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        </div>
+      </article>
+
+      <article class="sidebar-card">
+        <span class="sidebar-tag">Educação Médica</span>
+        <h4>MEC publica novas diretrizes curriculares para medicina</h4>
+        <p>Mudanças incluem maior ênfase em atenção primária e competências digitais nos primeiros anos do curso.</p>
+        <div class="sidebar-meta">
+          <span>18 out 2026</span>
+          <a class="sidebar-link" href="#noticias" data-go="noticias">Ler mais <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        </div>
+      </article>
+    </aside>
+  </div>
 
   <section class="cta-band">
     <div class="wrap">
@@ -564,6 +651,59 @@ footer p strong { color: var(--ink); }
 
   <section class="vlist">
     <div class="wrap"><div class="grid" id="list"></div></div>
+  </section>
+</div>
+
+<!-- ================= Notícias ================= -->
+<div id="view-noticias" hidden>
+  <section class="news-hero">
+    <div class="wrap">
+      <a class="back" href="#inicio" data-go="inicio"><svg aria-hidden="true"><use href="#i-back"/></svg>Início</a>
+      <h1>Notícias & Saúde</h1>
+      <p>Artigos, pesquisas e atualizações relevantes para estudantes de medicina. Conteúdo curado pela equipe Handoff.</p>
+    </div>
+  </section>
+  <section class="section">
+    <div class="wrap">
+      <div class="news-grid">
+        <article class="news-card">
+          <span class="sidebar-tag">Pesquisa</span>
+          <h3>Novo protocolo de triagem neonatal é adotado pelo SUS</h3>
+          <p>Ministério da Saúde atualiza diretrizes para teste do pezinho, ampliando a detecção precoce de doenças raras em recém-nascidos. A medida deve impactar mais de 2 milhões de famílias por ano e reduzir o tempo de diagnóstico em até 40%.</p>
+          <div class="news-footer">
+            <span class="news-date">27 out 2026</span>
+            <a class="news-link" href="#">Ler artigo completo <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </div>
+        </article>
+        <article class="news-card">
+          <span class="sidebar-tag">Congresso</span>
+          <h3>CBR 2026: resumos aprovados sobre IA na radiologia</h3>
+          <p>Confira os trabalhos brasileiros selecionados para apresentação oral no Congresso Brasileiro de Radiologia deste ano. Pesquisas de USP, UNIFESP e UFRJ destacam uso de deep learning em laudos automatizados.</p>
+          <div class="news-footer">
+            <span class="news-date">25 out 2026</span>
+            <a class="news-link" href="#">Ler artigo completo <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </div>
+        </article>
+        <article class="news-card">
+          <span class="sidebar-tag">Saúde Pública</span>
+          <h3>OMS alerta para surto de dengue no sudeste asiático</h3>
+          <p>Estudantes de medicina em intercâmbio devem verificar orientações de vacinação e prevenção antes de viajar para a região. O surto já registrou mais de 3 milhões de casos em cinco países desde janeiro.</p>
+          <div class="news-footer">
+            <span class="news-date">22 out 2026</span>
+            <a class="news-link" href="#">Ler artigo completo <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </div>
+        </article>
+        <article class="news-card">
+          <span class="sidebar-tag">Educação Médica</span>
+          <h3>MEC publica novas diretrizes curriculares para medicina</h3>
+          <p>Mudanças incluem maior ênfase em atenção primária e competências digitais nos primeiros anos do curso. As instituições têm até 2028 para adaptar seus projetos pedagógicos às novas exigências.</p>
+          <div class="news-footer">
+            <span class="news-date">18 out 2026</span>
+            <a class="news-link" href="#">Ler artigo completo <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </div>
+        </article>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -1847,8 +1987,8 @@ footer p strong { color: var(--ink); }
   document.getElementById("f-free").addEventListener("change", function (e) { state.free = e.target.checked; render(); });
   document.getElementById("clear").addEventListener("click", function () { resetState(); syncInputs(); render(); });
 
-  // ---------- Navegação entre as duas páginas ----------
-  var home = document.getElementById("view-home"), vagas = document.getElementById("view-vagas");
+  // ---------- Navegação entre as páginas ----------
+  var home = document.getElementById("view-home"), vagas = document.getElementById("view-vagas"), noticias = document.getElementById("view-noticias");
   var menu = document.getElementById("menu"), menuBtn = document.getElementById("menu-btn");
   function closeMenu() { menu.classList.remove("open"); menuBtn.setAttribute("aria-expanded", "false"); }
   menuBtn.addEventListener("click", function () { var o = menu.classList.toggle("open"); menuBtn.setAttribute("aria-expanded", String(o)); });
@@ -1856,11 +1996,22 @@ footer p strong { color: var(--ink); }
   function route(token, fromClick) {
     token = token || "inicio";
     var isVagas = token === "vagas" || token === "abertas" || token.indexOf("c-") === 0;
-    home.hidden = isVagas; vagas.hidden = !isVagas;
+    var isNoticias = token === "noticias";
+
+    // Alternar visibilidade das views principais
+    home.hidden = isVagas || isNoticias;
+    vagas.hidden = !isVagas;
+    if (noticias) noticias.hidden = !isNoticias;
+
+    // Atualizar estado ativo no menu
     document.querySelectorAll(".menu a").forEach(function (a) {
-      var g = a.getAttribute("data-go"); a.toggleAttribute("aria-current", isVagas ? g === "vagas" : g === token);
-      if (a.hasAttribute("aria-current")) a.setAttribute("aria-current", "page");
+      var g = a.getAttribute("data-go");
+      var isActive = isVagas ? g === "vagas" : g === token;
+      a.toggleAttribute("aria-current", isActive);
+      if (isActive) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
     });
+
     if (isVagas) {
       if (fromClick || token !== "vagas") {
         resetState();
@@ -1869,6 +2020,8 @@ footer p strong { color: var(--ink); }
         syncInputs();
       }
       render();
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    } else if (isNoticias) {
       window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     } else {
       var target = token === "inicio" ? null : document.getElementById(token);
