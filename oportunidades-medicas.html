@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Oportunidades de trabalho para médicos selecionadas pelo Handoff.">
+  <title>Vagas para médicos | Handoff</title>
+  <style>
+    :root { color-scheme: light; --ink:#182333; --muted:#667085; --line:#e5e9ef; --brand:#3157d5; --wash:#f5f7fb; }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--wash); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif }
+    main { width:min(980px,100% - 32px); margin:42px auto 64px }
+    .eyebrow { margin:0 0 6px; color:var(--brand); font-size:.78rem; font-weight:750; letter-spacing:.1em; text-transform:uppercase }
+    h1 { margin:0; font-size:clamp(1.8rem,5vw,2.6rem); line-height:1.15 }
+    .intro { max-width:650px; margin:12px 0 24px; color:var(--muted) }
+    .toolbar { display:flex; gap:12px; margin:0 0 18px }
+    input,select { min-height:46px; border:1px solid var(--line); border-radius:10px; background:white; color:var(--ink); font:inherit; padding:9px 12px }
+    input { flex:1; min-width:0 }
+    .count { margin:0 0 12px; color:var(--muted); font-size:.9rem }
+    #jobs { display:grid; gap:12px }
+    .job { padding:19px; border:1px solid var(--line); border-radius:14px; background:#fff; box-shadow:0 2px 8px #18233308 }
+    .job h2 { margin:0 0 5px; font-size:1.15rem }
+    .org { margin:0; font-weight:650 }
+    .details { display:flex; flex-wrap:wrap; gap:7px 16px; margin:12px 0; color:var(--muted); font-size:.91rem }
+    .tag { display:inline-block; border-radius:999px; background:#edf1ff; color:#2949b5; padding:3px 9px; font-size:.78rem; font-weight:700 }
+    .description { margin:10px 0; color:#465263 }
+    .apply { display:inline-flex; margin-top:5px; color:var(--brand); font-weight:700; text-decoration:none }
+    .apply:hover { text-decoration:underline }
+    .empty { padding:28px 20px; border:1px dashed #cbd2dd; border-radius:14px; background:#fff; color:var(--muted); text-align:center }
+    .error { color:#a13d32 }
+    @media(max-width:600px) { main { margin-top:28px } .toolbar { flex-direction:column } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Handoff · oportunidades</p>
+    <h1>Vagas para médicos</h1>
+    <p class="intro">Encontre oportunidades de trabalho médico divulgadas pelo Handoff. Confira os detalhes e os requisitos diretamente com a organização responsável.</p>
+    <div class="toolbar" role="search">
+      <input id="search" type="search" aria-label="Buscar vagas" placeholder="Buscar por cargo, instituição ou cidade">
+    </div>
+    <p class="count" id="count" aria-live="polite">Carregando oportunidades…</p>
+    <section id="jobs" aria-label="Oportunidades de trabalho médico"></section>
+  </main>
+  <script>
+    // Arquivo de dados local do site; cadastre apenas oportunidades de SC.
+    const jobsEl = document.querySelector("#jobs");
+    const countEl = document.querySelector("#count");
+    const searchEl = document.querySelector("#search");
+    let jobs = [];
+
+    function parseCSV(text) {
+      const rows = []; let row = [], cell = "", quoted = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (c === '"' && quoted && text[i + 1] === '"') { cell += '"'; i++; }
+        else if (c === '"') quoted = !quoted;
+        else if (c === "," && !quoted) { row.push(cell); cell = ""; }
+        else if ((c === "\n" || c === "\r") && !quoted) {
+          if (c === "\r" && text[i + 1] === "\n") i++;
+          row.push(cell); if (row.some(v => v.trim())) rows.push(row); row = []; cell = "";
+        } else cell += c;
+      }
+      row.push(cell); if (row.some(v => v.trim())) rows.push(row);
+      if (!rows.length) return [];
+      const headers = rows.shift().map(h => h.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_"));
+      return rows.map(r => Object.fromEntries(headers.map((h, i) => [h, (r[i] || "").trim()])));
+    }
+    const val = (item, ...keys) => keys.map(k => item[k]).find(v => v) || "";
+    function render() {
+      const q = searchEl.value.trim().toLocaleLowerCase("pt-BR");
+      const visible = jobs.filter(j => {
+        const haystack = [j.titulo, j.instituicao, j.cidade, j.regiao, j.descricao, j.tipo].join(" ").toLocaleLowerCase("pt-BR");
+        return (!q || haystack.includes(q));
+      });
+      countEl.textContent = `${visible.length} ${visible.length === 1 ? "oportunidade" : "oportunidades"}`;
+      jobsEl.replaceChildren();
+      if (!visible.length) { jobsEl.innerHTML = '<p class="empty">Nenhuma oportunidade encontrada com esses filtros.</p>'; return; }
+      for (const j of visible) {
+        const card = document.createElement("article"); card.className = "job";
+        const title = document.createElement("h2"); title.textContent = j.titulo || "Oportunidade médica";
+        const org = document.createElement("p"); org.className = "org"; org.textContent = j.instituicao;
+        const details = document.createElement("div"); details.className = "details";
+        [j.cidade, j.regiao, j.modalidade, j.tipo, j.prazo ? `Inscrições até ${j.prazo}` : ""].filter(Boolean).forEach(x => { const span = document.createElement("span"); span.textContent = x; details.append(span); });
+        card.append(title); if (j.destaque) { const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = j.destaque; card.append(tag); }
+        if (j.instituicao) card.append(org); card.append(details);
+        if (j.descricao) { const desc = document.createElement("p"); desc.className = "description"; desc.textContent = j.descricao; card.append(desc); }
+        if (j.link) { const link = document.createElement("a"); link.className = "apply"; link.href = j.link; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Ver oportunidade ↗"; card.append(link); }
+        jobsEl.append(card);
+      }
+    }
+    async function load() {
+      try {
+        const response = await fetch("vagas-medicos-sc.json", { cache: "no-store" });
+        if (!response.ok) throw new Error("Não foi possível carregar a lista.");
+        jobs = (await response.json()).filter(j => {
+          const uf = String(j.uf || j.estado || "").trim().toUpperCase();
+          const local = String(j.local || j.cidade || "").trim().toLowerCase();
+          return uf === "SC" || uf === "SANTA CATARINA" || local.endsWith(", sc") || local.endsWith(", santa catarina");
+        }).map(j => ({
+          titulo: j.titulo || j.especialidade || "Oportunidade médica", instituicao: j.instituicao || "",
+          cidade: j.cidade || j.local || "", regiao: "Santa Catarina", modalidade: j.modalidade || "",
+          tipo: j.tipo || j.regime || "", prazo: j.prazo || "", descricao: j.descricao || j.resumo || "",
+          link: j.link || "", destaque: /^(sim|true|1)$/i.test(String(j.patrocinado || "")) ? "Divulgação patrocinada" : ""
+        }));
+        render();
+      } catch (error) { countEl.textContent = "Não foi possível carregar as oportunidades."; jobsEl.innerHTML = `<p class="empty error">${error.message}</p>`; }
+    }
+    searchEl.addEventListener("input", render); load();
+  </script>
+</body>
+</html>
