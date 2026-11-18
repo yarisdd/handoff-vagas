@@ -1,0 +1,37 @@
+name: Atualizar vagas médicas em SC
+
+on:
+  schedule:
+    - cron: "17 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atualizar-vagas-medicos-sc
+  cancel-in-progress: false
+
+jobs:
+  atualizar-feed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Coletar fontes e atualizar feed público
+        run: python scripts/atualizar_vagas_medicos_sc.py
+      - name: Publicar alterações no feed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vagas-medicos-sc.json
+          if git diff --cached --quiet; then
+            echo "O feed já está atualizado."
+          else
+            git commit -m "Atualiza vagas médicas em SC"
+            git push
+          fi
